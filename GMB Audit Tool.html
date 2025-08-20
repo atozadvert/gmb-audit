@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google Business Profile Audit Tool</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Libraries for PDF Generation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .progress-bar-fill {
+            transition: width 0.5s ease-in-out;
+        }
+        .task-item:hover {
+            background-color: #f9fafb;
+        }
+        /* Styles for printing the PDF */
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+            #reportModal, #reportModal * {
+                visibility: visible;
+            }
+            #reportModal {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+            }
+            #closeModalBtn, #downloadPdfBtn {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800">
+    <div class="container mx-auto p-4 md:p-8 max-w-4xl">
+        <header class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-gray-900">Google Business Profile Audit Tool</h1>
+            <p class="text-lg text-gray-600 mt-2">Your comprehensive checklist for optimizing your GBP and ranking higher on Google Maps.</p>
+        </header>
+
+        <div class="bg-white p-6 rounded-2xl shadow-lg mb-8">
+             <h2 class="text-2xl font-semibold mb-4 text-gray-800">1. Enter Your Business Profile URL</h2>
+             <input type="url" id="gmbLink" placeholder="https://maps.app.goo.gl/..." class="w-full p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+             <p class="text-sm text-gray-500 mt-2">Note: This tool helps you perform a manual audit. It does not automatically analyze the URL.</p>
+        </div>
+
+        <div class="bg-white p-6 rounded-2xl shadow-lg mb-8">
+            <h2 class="text-2xl font-semibold mb-4 text-gray-800">2. Complete the Audit Checklist</h2>
+            <div class="w-full bg-gray-200 rounded-full h-4">
+                <div id="progressBar" class="bg-blue-600 h-4 rounded-full progress-bar-fill" style="width: 0%"></div>
+            </div>
+            <p id="progressText" class="text-center mt-2 text-gray-700 font-medium">0% Complete</p>
+        </div>
+
+        <div id="auditSections">
+            <!-- Sections will be dynamically generated here -->
+        </div>
+
+        <div class="mt-8 text-center">
+             <button id="generateReportBtn" class="bg-blue-600 text-white font-bold py-3 px-8 rounded-lg hover:bg-blue-700 transition-colors shadow-md disabled:bg-gray-400 disabled:cursor-not-allowed" disabled>Generate Report</button>
+        </div>
+
+        <!-- Report Modal -->
+        <div id="reportModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center p-4">
+            <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full p-8 relative max-h-[90vh] overflow-y-auto">
+                <button id="closeModalBtn" class="absolute top-4 right-4 text-gray-500 hover:text-gray-800">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+                <div id="reportContentWrapper">
+                    <h2 class="text-3xl font-bold text-gray-900 mb-2 text-center">Your GBP Audit Report</h2>
+                    <p id="reportGmbLink" class="text-center text-blue-600 mb-6 break-all"></p>
+                    <div id="reportContent" class="space-y-6">
+                        <!-- Report content will be injected here -->
+                    </div>
+                </div>
+                 <div class="mt-8 text-center">
+                    <button id="downloadPdfBtn" class="bg-green-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-green-700 transition-colors shadow-md">Download as PDF</button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        const { jsPDF } = window.jspdf;
+
+        const auditData = [
+            {
+                category: 'Profile Completeness & Accuracy',
+                tasks: [
+                    { id: 'task1', text: 'Business Name is accurate and consistent with real-world branding.', recommendation: 'Ensure your business name is exactly as it appears on your storefront, website, and stationery. Avoid adding keywords or location information.' },
+                    { id: 'task2', text: 'Business Address is precise and accurate.', recommendation: 'Use a physical address, not a P.O. Box. Ensure it matches across all online platforms (website, social media, directories).' },
+                    { id: 'task3', text: 'Phone Number is a local, primary contact number.', recommendation: 'Use a local phone number with the correct area code. Ensure consistency across all platforms.' },
+                    { id: 'task4', text: 'Website URL is correct and links to the homepage or a relevant location page.', recommendation: 'Double-check the URL for typos. For multiple locations, link to the specific landing page for that location.' },
+                    { id: 'task5', text: 'Business Hours (including holiday and special hours) are up-to-date.', recommendation: 'Always update your hours for holidays or special events. Use the "More hours" feature for specific services like delivery.' },
+                    { id: 'task6', text: 'Primary Business Category is the most specific and accurate choice.', recommendation: 'Choose the most specific category that describes your core business. For example, "Italian Restaurant" instead of just "Restaurant".' },
+                    { id: 'task7', text: 'Relevant Secondary Categories are added.', recommendation: 'Add other categories that accurately represent your offerings without overdoing it.' },
+                    { id: 'task8', text: 'A compelling, keyword-rich Business Description is written (under 750 characters).', recommendation: 'Write a unique description that highlights what makes your business special. Naturally include 1-2 important keywords. Do not include links or promotional language.' },
+                    { id: 'task9', text: 'All applicable Attributes are selected (e.g., Wi-Fi, accessibility, payment options).', recommendation: 'Regularly review and update attributes as they are frequently updated by Google. This helps customers understand your business better.' },
+                ]
+            },
+            {
+                category: 'Visuals (Photos & Videos)',
+                tasks: [
+                    { id: 'task10', text: 'High-resolution Logo and Cover Photo are uploaded.', recommendation: 'Your logo helps customers recognize your brand. The cover photo should be a high-quality image that best represents your business.' },
+                    { id: 'task11', text: 'At least 3 high-quality exterior photos are added.', recommendation: 'Show your storefront from different angles and at different times of day to help customers find you.' },
+                    { id: 'task12', text: 'At least 3 high-quality interior photos are added.', recommendation: 'Showcase the ambiance and layout of your business to give customers a feel for your space.' },
+                    { id: 'task13', text: 'At least 3 photos of products/services are included.', recommendation: 'Visually represent what you sell. For services, show your work in action.' },
+                    { id: 'task14', text: 'At least 3 photos of your team at work are present.', recommendation: 'Humanize your business by showing the friendly faces behind it.' },
+                    { id: 'task15', text: 'Photos are geo-tagged with your business location.', recommendation: 'Use an online tool to add GPS coordinates to your image metadata before uploading to reinforce your location to Google.' },
+                    { id: 'task16', text: 'A short video (under 30 seconds) has been uploaded.', recommendation: 'Videos are highly engaging. A short tour, a customer testimonial, or a product demonstration works well.' },
+                    { id: 'task17', text: 'A 360° virtual tour has been added (if applicable).', recommendation: 'Use the Google Street View app to create and upload a virtual tour, which can significantly boost engagement.' },
+                ]
+            },
+            {
+                category: 'Customer Engagement',
+                tasks: [
+                    { id: 'task18', text: 'There is a strategy to consistently get new reviews.', recommendation: 'Actively ask satisfied customers for reviews. Use a shareable link from your GBP dashboard or a QR code at your location.' },
+                    { id: 'task19', text: 'All (or most) customer reviews are responded to promptly and professionally.', recommendation: 'Respond to both positive and negative reviews. Thank happy customers and address concerns from unhappy ones to show you care.' },
+                    { id: 'task20', text: 'Keywords are naturally included in review responses.', recommendation: 'When appropriate, mention your services or location in your responses (e.g., "We\'re glad you enjoyed our deep dish pizza here in Chicago!").' },
+                    { id: 'task21', text: 'The Q&A section is seeded with frequently asked questions.', recommendation: 'Proactively answer common questions about parking, services, or policies. This saves customers time and allows you to control the narrative.' },
+                    { id: 'task22', text: 'The Q&A section is monitored for new questions.', recommendation: 'Set up alerts to be notified of new questions so you can answer them quickly before a customer does.' },
+                    { id: 'task23', text: 'The Messaging feature is enabled and responses are timely.', recommendation: 'Enable messaging to allow customers to contact you directly. Quick response times are key to a good customer experience.' },
+                ]
+            },
+            {
+                category: 'Content & Updates (Google Posts)',
+                tasks: [
+                    { id: 'task24', text: 'A Google Post has been published in the last 7 days.', recommendation: 'Regularly posting signals to Google that your profile is active. Aim for at least one post per week.' },
+                    { id: 'task25', text: 'Posts use high-quality images or videos.', recommendation: 'Visuals make your posts stand out. Use compelling images that are relevant to your update.' },
+                    { id: 'task26', text: 'Posts include a clear Call-to-Action (CTA).', recommendation: 'Use CTAs like "Learn More," "Call Now," or "Book" to encourage users to take the next step.' },
+                    { id: 'task27', text: 'Different post types (Offer, Update, Event) are utilized.', recommendation: 'Vary your content by using different post formats to promote sales, share news, or announce events.' },
+                ]
+            },
+            {
+                category: 'Products & Services',
+                tasks: [
+                    { id: 'task28', text: 'Products are listed with high-quality images, prices, and descriptions.', recommendation: 'If you sell products, create a complete catalog on your GBP. This can appear in search results and drive sales.' },
+                    { id: 'task29', text: 'Services are listed with detailed descriptions and prices (if applicable).', recommendation: 'Clearly outline all the services you offer. This helps you rank for service-specific searches.' },
+                ]
+            },
+            {
+                category: 'Local SEO & Consistency',
+                tasks: [
+                    { id: 'task30', text: 'NAP (Name, Address, Phone) is consistent across all major online directories (Yelp, etc.).', recommendation: 'Inconsistencies can confuse Google and hurt your ranking. Do an audit of your citations on other platforms.' },
+                    { id: 'task31', text: 'The business website is mobile-friendly and loads quickly.', recommendation: 'A poor website experience can negatively impact your local ranking. Use Google\'s PageSpeed Insights to test your site.' },
+                    { id: 'task32', text: 'The website has location-specific keywords and content.', recommendation: 'Create content on your website that is relevant to your local area, such as blog posts about local events or neighborhood guides.' },
+                    { id: 'task33', text: 'Local Business schema markup is implemented on the website.', recommendation: 'This structured data helps search engines understand your business information, which can lead to better visibility.' },
+                ]
+            }
+        ];
+
+        const auditSectionsContainer = document.getElementById('auditSections');
+        const progressBar = document.getElementById('progressBar');
+        const progressText = document.getElementById('progressText');
+        const generateReportBtn = document.getElementById('generateReportBtn');
+        const reportModal = document.getElementById('reportModal');
+        const closeModalBtn = document.getElementById('closeModalBtn');
+        const reportContent = document.getElementById('reportContent');
+        const reportGmbLink = document.getElementById('reportGmbLink');
+        const gmbLinkInput = document.getElementById('gmbLink');
+        const downloadPdfBtn = document.getElementById('downloadPdfBtn');
+        const reportContentWrapper = document.getElementById('reportContentWrapper');
+
+        let totalTasks = 0;
+        let completedTasks = 0;
+
+        function renderAuditSections() {
+            auditData.forEach(section => {
+                const sectionEl = document.createElement('div');
+                sectionEl.className = 'bg-white p-6 rounded-2xl shadow-lg mb-6';
+                
+                let tasksHtml = section.tasks.map(task => {
+                    totalTasks++;
+                    return `
+                        <div class="task-item flex items-center justify-between py-3 border-b border-gray-200 last:border-b-0">
+                            <label for="${task.id}" class="flex-1 text-gray-700 cursor-pointer">${task.text}</label>
+                            <input type="checkbox" id="${task.id}" data-task-id="${task.id}" class="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer">
+                        </div>
+                    `;
+                }).join('');
+
+                sectionEl.innerHTML = `
+                    <h3 class="text-xl font-semibold mb-4 text-gray-800">${section.category}</h3>
+                    <div class="divide-y divide-gray-200">
+                        ${tasksHtml}
+                    </div>
+                `;
+                auditSectionsContainer.appendChild(sectionEl);
+            });
+        }
+
+        function updateProgress() {
+            const checkboxes = document.querySelectorAll('input[type="checkbox"]');
+            completedTasks = Array.from(checkboxes).filter(cb => cb.checked).length;
+            
+            const percentage = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+            
+            progressBar.style.width = `${percentage}%`;
+            progressText.textContent = `${percentage}% Complete`;
+
+            generateReportBtn.disabled = completedTasks === 0;
+        }
+
+        function generateReport() {
+            let reportHtml = '';
+            const incompleteTasks = [];
+            
+            const gmbLink = gmbLinkInput.value;
+            reportGmbLink.textContent = gmbLink ? `Report for: ${gmbLink}` : 'No URL Provided';
+
+
+            auditData.forEach(section => {
+                const sectionIncompleteTasks = section.tasks.filter(task => {
+                    const checkbox = document.getElementById(task.id);
+                    return checkbox && !checkbox.checked;
+                });
+
+                if (sectionIncompleteTasks.length > 0) {
+                    incompleteTasks.push({
+                        category: section.category,
+                        tasks: sectionIncompleteTasks
+                    });
+                }
+            });
+
+            const score = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+            
+            reportHtml += `
+                <div class="text-center mb-8">
+                    <p class="text-lg text-gray-600">Your Google Business Profile Score:</p>
+                    <p class="text-6xl font-bold ${score >= 80 ? 'text-green-600' : score >= 50 ? 'text-yellow-500' : 'text-red-600'}">${score}%</p>
+                    <p class="mt-2 text-gray-700">${completedTasks} out of ${totalTasks} best practices met.</p>
+                </div>
+            `;
+
+            if (incompleteTasks.length > 0) {
+                reportHtml += '<h3 class="text-2xl font-semibold text-gray-800 mb-4 border-b pb-2">Recommendations for Improvement:</h3>';
+                incompleteTasks.forEach(section => {
+                    reportHtml += `<div class="mb-6"><h4 class="text-xl font-semibold text-gray-700 mb-3">${section.category}</h4><ul class="list-disc list-inside space-y-2">`;
+                    section.tasks.forEach(task => {
+                        reportHtml += `
+                            <li class="text-gray-800">
+                                <span class="font-semibold">${task.text}</span>
+                                <p class="text-gray-600 pl-4 text-sm">${task.recommendation}</p>
+                            </li>
+                        `;
+                    });
+                    reportHtml += '</ul></div>';
+                });
+            } else {
+                reportHtml += `
+                    <div class="text-center p-6 bg-green-50 rounded-lg">
+                        <h3 class="text-2xl font-semibold text-green-800">Congratulations!</h3>
+                        <p class="text-green-700 mt-2">Your Google Business Profile is fully optimized according to all best practices. Keep up the great work by regularly updating your profile!</p>
+                    </div>
+                `;
+            }
+
+            reportContent.innerHTML = reportHtml;
+            reportModal.classList.remove('hidden');
+            reportModal.classList.add('flex');
+        }
+
+        function downloadPdf() {
+            const reportElement = reportContentWrapper;
+            const businessName = gmbLinkInput.value.split('/').pop() || 'GMB-Audit-Report';
+
+            html2canvas(reportElement, { scale: 2 }).then(canvas => {
+                const imgData = canvas.toDataURL('image/png');
+                const pdf = new jsPDF({
+                    orientation: 'portrait',
+                    unit: 'pt',
+                    format: 'a4'
+                });
+                
+                const pdfWidth = pdf.internal.pageSize.getWidth();
+                const pdfHeight = pdf.internal.pageSize.getHeight();
+                const canvasWidth = canvas.width;
+                const canvasHeight = canvas.height;
+                const ratio = canvasWidth / canvasHeight;
+                const imgHeight = pdfWidth / ratio;
+                let heightLeft = imgHeight;
+                let position = 0;
+
+                pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, imgHeight);
+                heightLeft -= pdfHeight;
+
+                while (heightLeft >= 0) {
+                    position = heightLeft - imgHeight;
+                    pdf.addPage();
+                    pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, imgHeight);
+                    heightLeft -= pdfHeight;
+                }
+                
+                pdf.save(`${businessName}.pdf`);
+            });
+        }
+
+
+        document.addEventListener('DOMContentLoaded', () => {
+            renderAuditSections();
+            const checkboxes = document.querySelectorAll('input[type="checkbox"]');
+            checkboxes.forEach(cb => {
+                cb.addEventListener('change', updateProgress);
+            });
+
+            generateReportBtn.addEventListener('click', generateReport);
+            downloadPdfBtn.addEventListener('click', downloadPdf);
+            closeModalBtn.addEventListener('click', () => {
+                reportModal.classList.add('hidden');
+                reportModal.classList.remove('flex');
+            });
+        });
+    </script>
+</body>
+</html>
